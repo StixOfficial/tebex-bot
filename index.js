@@ -41,22 +41,39 @@ const command = new SlashCommandBuilder()
       .setRequired(true)
   );
 
-/* ---------------- REGISTER COMMAND ---------------- */
+/* ---------------- LOGIN ---------------- */
+
+client.login(process.env.DISCORD_TOKEN);
+
+/* ---------------- REGISTER COMMANDS ---------------- */
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
 
-async function registerCommands() {
-  const app = await client.login(process.env.DISCORD_TOKEN);
+client.once("ready", async () => {
+  try {
+    await rest.put(
+      Routes.applicationGuildCommands(client.user.id, process.env.GUILD_ID),
+      { body: [command.toJSON()] }
+    );
 
-  await rest.put(
-    Routes.applicationGuildCommands(app.user.id, process.env.GUILD_ID),
-    { body: [command.toJSON()] }
-  );
+    console.log("Slash command registered");
 
-  console.log("Slash command registered");
-}
+    // Set bot status
+    client.user.setPresence({
+      activities: [
+        {
+          name: "Fuze Studios Store",
+          type: ActivityType.Watching
+        }
+      ],
+      status: "online"
+    });
 
-registerCommands();
+    console.log("Bot is online and watching Fuze Studios Store");
+  } catch (error) {
+    console.error("Failed to register slash commands:", error);
+  }
+});
 
 /* ---------------- REDEEM HANDLER ---------------- */
 
@@ -65,15 +82,14 @@ client.on("interactionCreate", async interaction => {
   if (interaction.commandName !== "redeem") return;
 
   const tebexId = interaction.options.getString("tebex_id");
+
   await interaction.deferReply({ ephemeral: true });
 
-  // Check if already redeemed
   db.get("SELECT * FROM claims WHERE tebex_id = ?", [tebexId], async (err, row) => {
     if (row) {
       return interaction.editReply("❌ This Tebex ID has already been redeemed.");
     }
 
-    // Check Tebex
     try {
       const res = await fetch(`https://plugin.tebex.io/payments/${tebexId}`, {
         headers: {
@@ -85,11 +101,9 @@ client.on("interactionCreate", async interaction => {
         return interaction.editReply("❌ Invalid Tebex ID.");
       }
 
-      // Give role
       const member = await interaction.guild.members.fetch(interaction.user.id);
       await member.roles.add(process.env.CLIENT_ROLE_ID);
 
-      // Save to database
       db.run(
         "INSERT INTO claims (tebex_id, discord_id) VALUES (?, ?)",
         [tebexId, interaction.user.id]
@@ -99,23 +113,7 @@ client.on("interactionCreate", async interaction => {
 
     } catch (error) {
       console.error(error);
-      interaction.editReply("⚠️ Tebex is currently unreachable. Try again later.");
+      interaction.editReply("⚠️ Tebex is unreachable. Try again later.");
     }
   });
-});
-
-/* ---------------- BOT READY ---------------- */
-
-client.once("ready", () => {
-  client.user.setPresence({
-    activities: [
-      {
-        name: "Fuze Studios Store",
-        type: ActivityType.Watching
-      }
-    ],
-    status: "online"
-  });
-
-  console.log("Bot is online and watching Fuze Studios Store");
 });
