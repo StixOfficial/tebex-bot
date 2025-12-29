@@ -45,7 +45,7 @@ const command = new SlashCommandBuilder()
 
 client.login(process.env.DISCORD_TOKEN);
 
-/* ---------------- REGISTER COMMANDS ---------------- */
+/* ---------------- REGISTER COMMAND ---------------- */
 
 const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
 
@@ -58,7 +58,7 @@ client.once("ready", async () => {
 
     console.log("Slash command registered");
 
-    // Set bot status
+    // Bot status
     client.user.setPresence({
       activities: [
         {
@@ -81,8 +81,15 @@ client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== "redeem") return;
 
-  const tebexId = interaction.options.getString("tebex_id");
+  // Channel restriction
+  if (interaction.channelId !== "1447572359719555152") {
+    return interaction.reply({
+      content: "❌ You must use this command in the verification channel.",
+      ephemeral: true
+    });
+  }
 
+  const tebexId = interaction.options.getString("tebex_id");
   await interaction.deferReply({ ephemeral: true });
 
   db.get("SELECT * FROM claims WHERE tebex_id = ?", [tebexId], async (err, row) => {
